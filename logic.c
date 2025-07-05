@@ -1,8 +1,14 @@
 #include <stdio.h>  // Required for file operations (fopen, fgets, fclose) and standard I/O (printf, fprintf)
 #include <stdlib.h> // Required for exit()
 #include <string.h>
+#include <stdarg.h>
 
 #define _CRT_SECURE_NO_WARNINGS 1
+#define SIZE_LINE_BUFFER 256
+#define SIZE_DICT_STRING 32
+
+#define COMMENT_TOKENIZER_STRING "#"
+#define ASSIGNMENT_TOKENIZER_STRING "=~"
 
 
 #if 0
@@ -71,10 +77,12 @@ struct sConfig
     {
     int numDataBits;
     int numAddrBits;
+    int Verbosity;
     };
 
 
-#define SIZE_DICT_STRING 32
+struct sConfig Config;
+
 
 struct sDictionaryItem
     {
@@ -83,20 +91,61 @@ struct sDictionaryItem
     };
 
 
-// *****************************************************************************
-// *****************************************************************************
-int main(int argc, char *argv[])
+
+void dbprintf(const char *format, ...)
     {
-    FILE *filePointer; // Declare a file pointer
-    char buffer[256];  // Declare a buffer to store each line (255 characters + null terminator)
+    if(Config.Verbosity)
+        {
+        va_list args;
+        va_start(args, format);
+        vprintf(format, args);
+        va_end(args);
+        }
+    }
+
+
+
+int HandleArgs(int argc, char *argv[])
+    {
+    // arg[0] is always the command name.
+    int ArgNum = 1;
 
     // Check if a filename was provided as a command-line argument
     if(argc != 2)
         {
-        fprintf(stderr, "Usage: %s <filename>\n", argv[0] );
+        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
         // fprintf(stderr, ...) prints to the standard error stream, which is good for error messages.
         // argv[0] is the name of the executable itself.
         return EXIT_FAILURE; // Indicate an error occurred
+        }
+
+    while(ArgNum < argc)
+        {
+        if(strcmp(argv[ArgNum], "-v") == 0)
+            {
+            // Verbosity
+            Config.Verbosity = 1;
+            }
+
+        ArgNum++;
+        }
+
+    return 0;
+    }
+
+
+
+// *****************************************************************************
+// *****************************************************************************
+int main(int argc, char *argv[])
+    {
+    FILE *filePointer; 
+    char buffer[SIZE_LINE_BUFFER];
+    int lineCounter = 0;
+
+    if(HandleArgs(argc, argv) != 0)
+        {
+        return EXIT_FAILURE;
         }
 
     // Attempt to open the file in read mode ("r")
@@ -109,7 +158,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;         // Indicate an error occurred
         }
 
-    printf("--- Contents of '%s' ---\n", argv[1]);
+    dbprintf("--- Contents of '%s' ---\n", argv[1]);
 
     // Read lines from the file until the end of the file (EOF) is reached or an error occurs
     int lineLength = 1;
@@ -121,42 +170,45 @@ int main(int argc, char *argv[])
         
         if(lineLength)
             {
-            printf("%s", buffer); // Print the line read from the file
+            // Use this for indicating errors.
+            lineCounter++;
+
+            dbprintf("%s", buffer); // Print the line read from the file
             // As we read each line, tokenize with this priority:
             //  * Comments (#)
             //  * Assignments (=)
             //  * Symbols (a0, d0, etc)
-            pToken = strtok(buffer, "#");
+            pToken = strtok(buffer, COMMENT_TOKENIZER_STRING);
 
             // pToken will be anything to the left of the comment character.
             if(pToken)
                 {
-                printf("Found '%s'\n", pToken);
+                dbprintf("Found '%s'\n", pToken);
                 // What we have now is a string without comments. Check for
                 // assignment.
-                pLeft = strtok(pToken, "=~");
+                pLeft = strtok(pToken, ASSIGNMENT_TOKENIZER_STRING);
 
                 if(pLeft)
                     {
                     // There was something to the left, see if there is
                     // also something to the right.
-                    pRight = strtok(NULL, "=~");
+                    pRight = strtok(NULL, ASSIGNMENT_TOKENIZER_STRING);
 
                     if(pRight)
                         {
-                        printf("Left : '%s'\n", pLeft);
-                        printf("Right : '%s'\n", pRight);
+                        dbprintf("Left : '%s'\n", pLeft);
+                        dbprintf("Right : '%s'\n", pRight);
                         }
                     }
                 }
             else
                 {
-                printf("Commented line : '%s'\n", buffer);
+                dbprintf("Commented line : '%s'\n", buffer);
                 }
             }
         }
 
-    printf("--- End of file ---\n");
+    dbprintf("--- End of file ---\n");
 
     // Close the file
     fclose(filePointer);
