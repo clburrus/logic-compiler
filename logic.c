@@ -143,7 +143,10 @@ int main(int argc, char *argv[])
     char buffer[SIZE_LINE_BUFFER];
     int lineCounter = 0;
 
-    HandleArgs(argc, argv);
+    if(HandleArgs(argc, argv) != 0)
+        {
+        return EXIT_FAILURE;
+        }
 
     // Attempt to open the file in read mode ("r")
     filePointer = fopen(argv[1], "r");
