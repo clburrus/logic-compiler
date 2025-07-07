@@ -2,18 +2,22 @@
 #include <stdlib.h> // Required for exit()
 #include <string.h>
 #include <stdarg.h>
+#include <ctype.h>
 
 #define _CRT_SECURE_NO_WARNINGS 1
 #define SIZE_LINE_BUFFER 256
 #define SIZE_DICT_STRING 32
 
-#define COMMENT_TOKENIZER_STRING "#"
+
+#define COMMENT_TOKENIZER_CHAR '#'
+#define COMMENT_TOKENIZER_STRING  { "#" }
 #define ASSIGNMENT_TOKENIZER_STRING "=~"
+#define WHITESPACE_TOKENIZER_STRING " \t"
 
 
 #if 0
-D = 8
-A = 16
+config databits = 8
+config addressbits = 16
 
 #                              1 1   1 1 1 1
 #    0 1 2 3    4 5 6 7    8 9 0 1   2 3 4 5
@@ -105,15 +109,17 @@ void dbprintf(const char *format, ...)
 
 
 
-int HandleArgs(int argc, char *argv[])
+// *****************************************************************************
+// *****************************************************************************
+int handleArgs(int argc, char *argv[])
     {
     // arg[0] is always the command name.
     int ArgNum = 1;
 
     // Check if a filename was provided as a command-line argument
-    if(argc != 2)
+    if(argc < 2)
         {
-        fprintf(stderr, "Usage: %s <filename>\n", argv[0]);
+        fprintf(stderr, "Usage: logic <filename>\n", argv[0]);
         // fprintf(stderr, ...) prints to the standard error stream, which is good for error messages.
         // argv[0] is the name of the executable itself.
         return EXIT_FAILURE; // Indicate an error occurred
@@ -134,6 +140,49 @@ int HandleArgs(int argc, char *argv[])
     }
 
 
+// *****************************************************************************
+// *****************************************************************************
+static void stringLower(char *str)
+    {
+    while(*str)
+        {
+        *str = tolower(*str);
+        str++;
+        }
+    }
+
+
+// *****************************************************************************
+// *****************************************************************************
+int handleKeyword(char *buffer)
+    {
+    char *pWord;
+
+    pWord = strtok(buffer, WHITESPACE_TOKENIZER_STRING);
+
+    if(pWord)
+        {
+        if(strcmp(pWord, "alias") == 0)
+            {
+            // alias <alias name> <address id>
+            }
+        else if(strcmp(pWord, "databits") == 0)
+            {
+
+            }
+        else if(strcmp(pWord, "addrbits") == 0)
+            {
+
+            }
+
+
+        pWord = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
+        }
+
+    return -1;
+    }
+
+
 
 // *****************************************************************************
 // *****************************************************************************
@@ -143,67 +192,88 @@ int main(int argc, char *argv[])
     char buffer[SIZE_LINE_BUFFER];
     int lineCounter = 0;
 
-    if(HandleArgs(argc, argv) != 0)
+    if(handleArgs(argc, argv) != 0)
         {
         return EXIT_FAILURE;
         }
 
     // Attempt to open the file in read mode ("r")
-    filePointer = fopen(argv[1], "r");
+    filePointer = fopen(argv[argc - 1], "r");
 
     // Check if the file was opened successfully
     if(filePointer == NULL)
         {
-        perror("Error opening file"); // perror prints a system error message based on errno
+        fprintf(stderr, "Error opening '%s'", argv); // perror prints a system error message based on errno
         return EXIT_FAILURE;         // Indicate an error occurred
         }
 
     dbprintf("--- Contents of '%s' ---\n", argv[1]);
 
     // Read lines from the file until the end of the file (EOF) is reached or an error occurs
-    int lineLength = 1;
-    while(lineLength)
+    char *Success = (char *)1;
+    while(Success)
         {
         char *pToken;
         char *pLeft, *pRight;
-        lineLength = fgets(buffer, sizeof(buffer), filePointer);
+        Success = fgets(buffer, sizeof(buffer), filePointer);
         
-        if(lineLength)
+        if(Success != NULL)
             {
+            int lineLength = strlen(buffer);
+
             // Use this for indicating errors.
             lineCounter++;
+            
+            // Convert the entire buffer to lowercase.
+            stringLower(buffer);
 
             dbprintf("%s", buffer); // Print the line read from the file
+            
             // As we read each line, tokenize with this priority:
             //  * Comments (#)
             //  * Assignments (=)
             //  * Symbols (a0, d0, etc)
-            pToken = strtok(buffer, COMMENT_TOKENIZER_STRING);
-
-            // pToken will be anything to the left of the comment character.
-            if(pToken)
+            
+            // Zero out the string at the comment character, get rid of
+            // any other unwanted characters while we're at it.
+            for(int i = 0; i < lineLength; i++)
                 {
-                dbprintf("Found '%s'\n", pToken);
-                // What we have now is a string without comments. Check for
-                // assignment.
-                pLeft = strtok(pToken, ASSIGNMENT_TOKENIZER_STRING);
-
-                if(pLeft)
+                if(buffer[i] == COMMENT_TOKENIZER_CHAR || 
+                   buffer[i] == '\r' || 
+                   buffer[i] == '\n')
                     {
-                    // There was something to the left, see if there is
-                    // also something to the right.
-                    pRight = strtok(NULL, ASSIGNMENT_TOKENIZER_STRING);
-
-                    if(pRight)
-                        {
-                        dbprintf("Left : '%s'\n", pLeft);
-                        dbprintf("Right : '%s'\n", pRight);
-                        }
+                    buffer[i] = 0;
+                    break;
                     }
                 }
-            else
+
+            // Any comments will be removed now.
+            dbprintf("Found '%s'\n", buffer);
+
+            // What we have now is a string without comments. Check for
+            // assignment.
+            pLeft = strtok(buffer, ASSIGNMENT_TOKENIZER_STRING);
+
+            if(pLeft)
                 {
-                dbprintf("Commented line : '%s'\n", buffer);
+                // There was something to the left, see if there is
+                // also something to the right.
+                pRight = strtok(NULL, ASSIGNMENT_TOKENIZER_STRING);
+
+                if(pRight)
+                    {
+                    // This is an assignment
+                    dbprintf("Left : '%s'\n", pLeft);
+                    dbprintf("Right : '%s'\n", pRight);
+                    }
+                else
+                    {
+                    if(handleKeyword(pLeft) == -1)
+                        {
+                        printf("Line %i", lineCounter);
+                        return EXIT_FAILURE;         // Indicate an error occurred
+                        }
+                    }
                 }
             }
         }
