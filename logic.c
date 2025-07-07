@@ -7,73 +7,12 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #define SIZE_LINE_BUFFER 256
 #define SIZE_DICT_STRING 32
-
+#define NUM_DICTIONARY_LINES 100
 
 #define COMMENT_TOKENIZER_CHAR '#'
-#define COMMENT_TOKENIZER_STRING  { "#" }
+#define COMMENT_TOKENIZER_STRING  { COMMENT_TOKENIZER_CHAR, 0 }
 #define ASSIGNMENT_TOKENIZER_STRING "=~"
 #define WHITESPACE_TOKENIZER_STRING " \t"
-
-
-#if 0
-config databits = 8
-config addressbits = 16
-
-#                              1 1   1 1 1 1
-#    0 1 2 3    4 5 6 7    8 9 0 1   2 3 4 5
-d0 = 1 x x x    x x x x    x x x x   x x x x    # buffer d0 = a0
-d1 = x 0 x x    x x x x    x x x x   x x x x	# inverter d1 = !a1
-d2 = x x 1 x    x x x x    x x x x   x x x x    #
-d2 = x x x 1    x x x x    x x x x   x x x x    # d2 = a2 | a3
-d3 = x x x x    1 1 x x    x x x x   x x x x    # d3 = a4 & a5
-d4 = x x x x    x x 1 0    x x x x   x x x x    #
-d4 = x x x x    x x 0 1    x x x x   x x x x    # d4 = a6 ^ a7(XOR)
-d5 = x x x x    x x x x    0 0 1 x   x x x x    #
-d6 = x x x x    x x x x    0 1 0 x   x x x x    # LUT
-d7 = x x x x    x x x x    0 1 1 x   x x x x    #
-
-# Other examples
-d0 ~1 1 1 1    1 1 1 1    1 1 1 1   1 1 1 0    # d0 = ~(0x8000)
-d1 = 1 0 x x    x x x x    x x x x   x x x x    # d1 = a0 & ~a1(a1 gates a0)
-
-#  ...in this case...
-#  d1 | a0  a1  a2  a3
-#  ------------------ -
-#  1 | 1   0   0   0
-#  0 | 0   1   0   0
-#  0 | 1   1   0   0
-#  0 | 0   0   1   0
-#  1 | 1   0   1   0
-#  0 | 0   1   1   0
-#  0 | 1   1   1   0
-#  0 | 0   0   0   1
-#  1 | 1   0   0   1
-
-#  address[18..0]
-#  data[7..0]
-
-assign / rd 	a0
-assign / wr 	a1
-assign 	A18 	a18
-assign 	A17 	a17
-assign 	A16 	a16
-assign 	A15 	a15
-assign / wait 	d5
-assign  RomSel	d1
-
-
-d1 = A18
-#endif
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -90,10 +29,16 @@ struct sConfig Config;
 
 struct sDictionaryItem
     {
-    unsigned char String[SIZE_DICT_STRING];
+    char String[SIZE_DICT_STRING];
     int AddrBit;
     };
 
+
+struct sDictionary
+    {
+    struct sDictionaryItem Item[NUM_DICTIONARY_LINES];
+    int Index;
+    } Dict;
 
 
 void dbprintf(const char *format, ...)
@@ -119,7 +64,7 @@ int handleArgs(int argc, char *argv[])
     // Check if a filename was provided as a command-line argument
     if(argc < 2)
         {
-        fprintf(stderr, "Usage: logic <filename>\n", argv[0]);
+        fprintf(stderr, "Usage: logic <filename>\n");
         // fprintf(stderr, ...) prints to the standard error stream, which is good for error messages.
         // argv[0] is the name of the executable itself.
         return EXIT_FAILURE; // Indicate an error occurred
@@ -152,6 +97,27 @@ static void stringLower(char *str)
     }
 
 
+
+// *****************************************************************************
+// *****************************************************************************
+int addAliasToDictionary(char *pAlias, char *pTarget)
+    {
+    if(pAlias && pTarget)
+        {
+        if(Dict.Index < (NUM_DICTIONARY_LINES - 1))
+            {
+            for(int i = 0; i < NUM_DICTIONARY_LINES; i++)
+                {
+                if(Dict.Item[i].String[0] == 0 || strcmp((const char *)Dict.Item[i].String, pAlias) == 0)
+                    {
+                    // Add this alias to the dictionary
+                    }
+                }
+            }
+        }
+    }
+
+
 // *****************************************************************************
 // *****************************************************************************
 int handleKeyword(char *buffer)
@@ -164,19 +130,51 @@ int handleKeyword(char *buffer)
         {
         if(strcmp(pWord, "alias") == 0)
             {
+            char *pAlias, *pTarget;
+
             // alias <alias name> <address id>
+            pAlias = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
+
+            if(pAlias)
+                {
+                pTarget = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
+
+                if(pTarget)
+                    {
+
+                    }
+                else
+                    {
+                    // No target for the alias.
+
+                    }
+                }
             }
         else if(strcmp(pWord, "databits") == 0)
             {
+            // databits <num data bits>
+            char *pValue = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
+
+            if(pValue)
+                {
+                Config.numDataBits = atoi(pValue);
+
+                return 1;
+                }
 
             }
         else if(strcmp(pWord, "addrbits") == 0)
             {
+            // addrbits <num address bits>
+            char *pValue = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
 
+            if(pValue)
+                {
+                Config.numAddrBits = atoi(pValue);
+
+                return 1;
+                }
             }
-
-
-        pWord = strtok(NULL, WHITESPACE_TOKENIZER_STRING);
         }
 
     return -1;
@@ -203,7 +201,7 @@ int main(int argc, char *argv[])
     // Check if the file was opened successfully
     if(filePointer == NULL)
         {
-        fprintf(stderr, "Error opening '%s'", argv); // perror prints a system error message based on errno
+        // fprintf(stderr, "Error opening '%s'", argv[]); // perror prints a system error message based on errno
         return EXIT_FAILURE;         // Indicate an error occurred
         }
 
@@ -219,7 +217,7 @@ int main(int argc, char *argv[])
         
         if(Success != NULL)
             {
-            int lineLength = strlen(buffer);
+            int lineLength = (int)strlen(buffer);
 
             // Use this for indicating errors.
             lineCounter++;
