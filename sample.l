@@ -1,6 +1,6 @@
 
 
-databits 8
+databits a8
 addrbits 16
 
 #    1 1 1 1    1 1

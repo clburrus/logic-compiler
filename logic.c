@@ -7,6 +7,7 @@
 #define _CRT_SECURE_NO_WARNINGS 1
 #define SIZE_LINE_BUFFER 256
 #define SIZE_DICT_STRING 32
+#define SIZE_FILE_PATH 4096
 #define NUM_DICTIONARY_LINES 100
 
 #define COMMENT_TOKENIZER_CHAR '#'
@@ -21,6 +22,7 @@ struct sConfig
     int numDataBits;
     int numAddrBits;
     int Verbosity;
+    char Filename[SIZE_FILE_PATH];
     };
 
 
@@ -72,10 +74,19 @@ int handleArgs(int argc, char *argv[])
 
     while(ArgNum < argc)
         {
-        if(strcmp(argv[ArgNum], "-v") == 0)
+        // Handle any command line options.
+        if(argv[ArgNum][0] == '-')
             {
-            // Verbosity
-            Config.Verbosity = 1;
+            if(strcmp(argv[ArgNum], "-v") == 0)
+                {
+                // Verbosity
+                Config.Verbosity = 1;
+                }
+            }
+        else
+            {
+            // Assume this is the file name.
+            strncpy(Config.Filename, argv[ArgNum]);
             }
 
         ArgNum++;
@@ -141,6 +152,10 @@ int handleKeyword(char *buffer)
 
                 if(pTarget)
                     {
+                    if(addAliasToDictionary(pAlias, pTarget) != 0)
+                        {
+
+                        }
 
                     }
                 else
@@ -196,7 +211,7 @@ int main(int argc, char *argv[])
         }
 
     // Attempt to open the file in read mode ("r")
-    filePointer = fopen(argv[argc - 1], "r");
+    filePointer = fopen(Config.Filename, "r");
 
     // Check if the file was opened successfully
     if(filePointer == NULL)
@@ -205,7 +220,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;         // Indicate an error occurred
         }
 
-    dbprintf("--- Contents of '%s' ---\n", argv[1]);
+    dbprintf("--- Contents of '%s' ---\n", Config.Filename);
 
     // Read lines from the file until the end of the file (EOF) is reached or an error occurs
     char *Success = (char *)1;
